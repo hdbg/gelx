@@ -78,7 +78,7 @@ impl MappedRustType {
 			}
 			STD_DATETIME | STD_PG_TIMESTAMPTZ if IS_CHRONO => {
 				ConvertionKind::Fallible {
-					target_token: quote!(#exports_ident::gel_protocol::model::DateTime),
+					target_token: quote!(#exports_ident::gel_protocol::model::Datetime),
 				}
 			}
 			CAL_LOCAL_DATETIME | STD_PG_TIMESTAMP if IS_CHRONO => {
