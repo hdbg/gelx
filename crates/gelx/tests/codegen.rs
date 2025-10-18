@@ -75,6 +75,25 @@ pub fn testname() -> String {
 #[case::geometry("select ext::postgis::makepoint(1.0, 1.0)")]
 #[case::geography("select <ext::postgis::geography>ext::postgis::makepoint(1.0, 1.0)")]
 #[case::custom_scalar("select (insert Simple { position := <default::Position>$position }) {**};")]
+#[cfg_attr(
+	feature = "with_bigdecimal",
+	case::bigdecimal_arg("select Transaction {*} filter .amount = <decimal>$amount;")
+)]
+#[cfg_attr(
+	feature = "with_chrono",
+	case::datetime_arg("select CreatedAt {*} filter .created_at = <datetime>$timestamp;")
+)]
+#[cfg_attr(
+	feature = "with_bigdecimal",
+	case::bigdecimal_optional_arg(
+		"with amount := <optional decimal>$amount, select Transaction {*} filter (.amount = \
+		 amount if exists amount else True);"
+	)
+)]
+#[cfg_attr(
+	feature = "with_chrono",
+	case::datetime_arg("select CreatedAt {*} filter .created_at = <datetime>$timestamp;")
+)]
 #[tokio::test]
 #[rustversion::attr(not(nightly), ignore = "requires nightly")]
 async fn codegen_literals(testname: String, #[case] query: &str) -> GelxCoreResult<()> {
