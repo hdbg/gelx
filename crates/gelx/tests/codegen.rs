@@ -16,6 +16,15 @@ fn get_features() -> String {
 	#[cfg(feature = "serde")]
 	features.push("serde");
 
+	#[cfg(feature = "with_bigdecimal")]
+	features.push("bigdecimal");
+
+	#[cfg(feature = "with_chrono")]
+	features.push("chrono");
+
+	#[cfg(feature = "with_bigint")]
+	features.push("bigint");
+
 	if !features.is_empty() {
 		features.insert(0, "_");
 	}
@@ -93,6 +102,13 @@ pub fn testname() -> String {
 #[cfg_attr(
 	feature = "with_chrono",
 	case::datetime_arg("select CreatedAt {*} filter .created_at = <datetime>$timestamp;")
+)]
+#[cfg_attr(
+	feature = "with_bigdecimal",
+	case::bigdecimal_optional_arg(
+		"with amount := <optional decimal>$amount, select Transaction {*} filter (.amount = \
+		 amount if exists amount else True);"
+	)
 )]
 #[tokio::test]
 #[rustversion::attr(not(nightly), ignore = "requires nightly")]

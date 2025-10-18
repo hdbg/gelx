@@ -21,7 +21,7 @@ pub mod example {
             encoder: &mut __g::gel_protocol::query_arg::Encoder,
         ) -> core::result::Result<(), __g::gel_errors::Error> {
             let map = __g::gel_protocol::named_args! {
-                "timestamp" => { let value : __g::gel_protocol::model::DateTime = self
+                "timestamp" => { let value : __g::gel_protocol::model::Datetime = self
                 .timestamp.clone().try_into().map_err(| e | { <
                 __g::gel_errors::kinds::NumericOutOfRangeError as
                 __g::gel_errors::ErrorKind > ::build() }) ?; value },

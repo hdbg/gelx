@@ -626,20 +626,62 @@ fn explore_object_shape_descriptor(
 		});
 
 		if is_input {
-			match output.conversion {
-				ConvertionKind::Fallible { target_token } => {
+			let create_map = |src_ident: TokenStream, target_token: TokenStream| {
+				quote! {
+					let value: #target_token = #src_ident.clone().try_into().map_err(|e| {
+							<#exports_ident::gel_errors::kinds::NumericOutOfRangeError as #exports_ident::gel_errors::ErrorKind>::build()
+						})?;
+					value
+				}	
+			};
+			match (output.conversion, element.cardinality()) {
+				(ConvertionKind::Infailable, _) => {
+					impl_named_args.push(quote!(#name => self.#safe_name_ident.clone(),));
+				}
+				(ConvertionKind::Fallible { .. }, Cardinality::NoResult) => {
+					panic!("Fallible conversion kind is not supported for `NoResult` cardinality");
+				}
+				(ConvertionKind::Fallible { target_token }, Cardinality::One) => {
+					let conv = create_map(quote!(self.#safe_name_ident), target_token);
 					impl_named_args.push(quote! {
 						#name => {
-							let value: #target_token = self.#safe_name_ident.clone().try_into().map_err(|e| {
-								<#exports_ident::gel_errors::kinds::NumericOutOfRangeError as #exports_ident::gel_errors::ErrorKind>::build()
-							})?;
-							value
+							#conv
 						},
 					});
 				}
-				_ => {
-					impl_named_args.push(quote!(#name => self.#safe_name_ident.clone(),));
-				}
+				(ConvertionKind::Fallible { target_token }, Cardinality::AtMostOne) => {
+					let closure_capture_ident = format_ident!("closure_opt_{}", safe_name_ident);
+					let conv = create_map(
+						quote!(#closure_capture_ident),
+						target_token,
+					);
+					impl_named_args.push(quote! {
+						#name => {
+						  match self.#safe_name_ident.clone() {
+							  Some(#closure_capture_ident) => {
+								  Some( { #conv})
+							  },
+							  None => None,
+						  }
+						}
+					});
+				},
+				(ConvertionKind::Fallible { target_token }, Cardinality::Many | Cardinality::AtLeastOne) => {
+					let closure_capture_ident = format_ident!("many_{}", safe_name_ident);
+					let conv = create_map(
+						quote!(#closure_capture_ident),
+						target_token,
+					);
+					impl_named_args.push(quote! {
+						#name => {
+							let mut vec = Vec::with_capacity(self.#safe_name_ident.len());
+							for #closure_capture_ident in &self.#safe_name_ident {
+								vec.push( { #conv });
+							}
+							vec
+						}
+					});
+				},
 			}
 		}
 	}
