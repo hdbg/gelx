@@ -32,7 +32,7 @@ pub mod example {
                 .clone().try_into().map_err(| e | { <
                 __g::gel_errors::kinds::NumericOutOfRangeError as
                 __g::gel_errors::ErrorKind > ::build() }) ?; value }) }, None => None, }
-                }
+                },
             };
             map.encode(encoder)
         }

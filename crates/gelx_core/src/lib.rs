@@ -663,7 +663,7 @@ fn explore_object_shape_descriptor(
 							  },
 							  None => None,
 						  }
-						}
+						},
 					});
 				},
 				(ConvertionKind::Fallible { target_token }, Cardinality::Many | Cardinality::AtLeastOne) => {
@@ -679,7 +679,7 @@ fn explore_object_shape_descriptor(
 								vec.push( { #conv });
 							}
 							vec
-						}
+						},
 					});
 				},
 			}
