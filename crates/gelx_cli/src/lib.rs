@@ -3,6 +3,7 @@
 use std::path::Path;
 use std::path::PathBuf;
 
+use check_keyword::CheckKeyword;
 use clap::Parser;
 use gelx_core::GelxCoreError;
 use gelx_core::GelxCoreResult;
@@ -13,6 +14,8 @@ use gelx_core::generate_query_token_stream;
 use gelx_core::get_descriptor;
 use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
+use quote::format_ident;
+use quote::quote;
 use similar::ChangeTag;
 use similar::TextDiff;
 use tokio::fs;
@@ -75,43 +78,80 @@ impl Cli {
 		root_path: impl AsRef<Path>,
 	) -> GelxCoreResult<ModuleOutputs> {
 		let root_path = root_path.as_ref();
-		let mut query_tokens = TokenStream::new();
 		let queries_path = root_path.join(&metadata.queries_path);
-
-		if queries_path.is_dir() {
-			// not async to make sorting easier
-			let mut entries = queries_path.read_dir()?.collect::<Result<Vec<_>, _>>()?;
-			entries.sort_by_key(std::fs::DirEntry::path);
-
-			for entry in entries {
-				let path = entry.path();
-
-				if !path.is_file() || path.extension().is_none_or(|ext| ext != "edgeql") {
-					continue;
-				}
-
-				let query_content = fs::read_to_string(&path).await?;
-				let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
-				let module_name = file_stem.to_snake_case();
-
-				eprintln!("Processing query: {}", path.display());
-				let descriptor = get_descriptor(&query_content, metadata).await?;
-				let token_stream = generate_query_token_stream(
-					&descriptor,
-					&module_name,
-					&query_content,
-					metadata,
-					false,
-				)?;
-
-				query_tokens.extend(token_stream);
-			}
-		}
+		let query_tokens = if queries_path.is_dir() {
+			Self::process_queries_recursive(&queries_path, metadata).await?
+		} else {
+			TokenStream::new()
+		};
 
 		let mut outputs = generate_module_outputs(metadata).await?;
 		outputs.append_to_root(&query_tokens);
 
 		Ok(outputs)
+	}
+
+	/// Recursively processes query files and directories, generating the
+	/// appropriate module structure.
+	async fn process_queries_recursive(
+		dir_path: &Path,
+		metadata: &GelxMetadata,
+	) -> GelxCoreResult<TokenStream> {
+		let mut tokens = TokenStream::new();
+		// not async to make sorting easier
+		let mut entries = dir_path.read_dir()?.collect::<Result<Vec<_>, _>>()?;
+		entries.sort_by_key(std::fs::DirEntry::path);
+
+		for entry in entries {
+			let path = entry.path();
+
+			if path.is_file() {
+				// Process .edgeql files
+				if path.extension().is_some_and(|ext| ext == "edgeql") {
+					let query_content = fs::read_to_string(&path).await?;
+					let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
+					let module_name = file_stem.to_snake_case();
+
+					eprintln!("Processing query: {}", path.display());
+					let descriptor = get_descriptor(&query_content, metadata).await?;
+					let token_stream = generate_query_token_stream(
+						&descriptor,
+						&module_name,
+						&query_content,
+						metadata,
+						false,
+					)?;
+
+					tokens.extend(token_stream);
+				}
+			} else if path.is_dir() {
+				// Recursively process subdirectories
+				let dir_name = path
+					.file_name()
+					.unwrap_or_default()
+					.to_string_lossy()
+					.to_string();
+				let safe_dir_name = dir_name.to_snake_case().into_safe();
+				let module_ident = format_ident!("{}", safe_dir_name);
+
+				eprintln!("Processing directory: {}", path.display());
+				let submodule_tokens =
+					Box::pin(Self::process_queries_recursive(&path, metadata)).await?;
+
+				// Only generate module if it has content
+				if !submodule_tokens.is_empty() {
+					tokens.extend(quote! {
+						pub mod #module_ident {
+							use super::*;
+
+							#submodule_tokens
+						}
+					});
+				}
+			}
+		}
+
+		Ok(tokens)
 	}
 
 	/// Generates Rust code from the crate in the current directory.
