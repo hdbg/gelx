@@ -39,14 +39,14 @@ pub(crate) fn uuid_to_token_name(uuid: &Uuid, exports_ident: &Ident) -> MappedRu
 	MappedRustType::new(uuid, exports_ident).unwrap_or(MappedRustType {
 		token: quote!(#exports_ident::gel_protocol::value::Value),
 		import: None,
-		convertion_kind: ConvertionKind::Infailable,
+		convertion_kind: ConvertionKind::Direct,
 	})
 }
 
 #[derive(Default)]
 pub enum ConvertionKind {
 	#[default]
-	Infailable,
+	Direct,
 	Fallible {
 		target_token: TokenStream,
 	},
@@ -97,7 +97,7 @@ impl MappedRustType {
 				}
 			}
 
-			_ => ConvertionKind::Infailable,
+			_ => ConvertionKind::Direct,
 		};
 		Some(MappedRustType {
 			token: token_name,

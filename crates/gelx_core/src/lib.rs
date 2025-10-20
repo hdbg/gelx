@@ -258,7 +258,7 @@ impl From<TokenStream> for ExploreResult {
 	fn from(value: TokenStream) -> Self {
 		Self {
 			token: Some(value),
-			conversion: ConvertionKind::Infailable,
+			conversion: ConvertionKind::Direct,
 		}
 	}
 }
@@ -266,7 +266,7 @@ impl From<Option<TokenStream>> for ExploreResult {
 	fn from(value: Option<TokenStream>) -> Self {
 		Self {
 			token: value,
-			conversion: ConvertionKind::Infailable,
+			conversion: ConvertionKind::Direct,
 		}
 	}
 }
@@ -632,10 +632,10 @@ fn explore_object_shape_descriptor(
 							<#exports_ident::gel_errors::kinds::NumericOutOfRangeError as #exports_ident::gel_errors::ErrorKind>::build()
 						})?;
 					value
-				}	
+				}
 			};
 			match (output.conversion, element.cardinality()) {
-				(ConvertionKind::Infailable, _) => {
+				(ConvertionKind::Direct, _) => {
 					impl_named_args.push(quote!(#name => self.#safe_name_ident.clone(),));
 				}
 				(ConvertionKind::Fallible { .. }, Cardinality::NoResult) => {
@@ -651,10 +651,7 @@ fn explore_object_shape_descriptor(
 				}
 				(ConvertionKind::Fallible { target_token }, Cardinality::AtMostOne) => {
 					let closure_capture_ident = format_ident!("closure_opt_{}", safe_name_ident);
-					let conv = create_map(
-						quote!(#closure_capture_ident),
-						target_token,
-					);
+					let conv = create_map(quote!(#closure_capture_ident), target_token);
 					impl_named_args.push(quote! {
 						#name => {
 						  match self.#safe_name_ident.clone() {
@@ -665,13 +662,13 @@ fn explore_object_shape_descriptor(
 						  }
 						},
 					});
-				},
-				(ConvertionKind::Fallible { target_token }, Cardinality::Many | Cardinality::AtLeastOne) => {
+				}
+				(
+					ConvertionKind::Fallible { target_token },
+					Cardinality::Many | Cardinality::AtLeastOne,
+				) => {
 					let closure_capture_ident = format_ident!("many_{}", safe_name_ident);
-					let conv = create_map(
-						quote!(#closure_capture_ident),
-						target_token,
-					);
+					let conv = create_map(quote!(#closure_capture_ident), target_token);
 					impl_named_args.push(quote! {
 						#name => {
 							let mut vec = Vec::with_capacity(self.#safe_name_ident.len());
@@ -681,7 +678,7 @@ fn explore_object_shape_descriptor(
 							vec
 						},
 					});
-				},
+				}
 			}
 		}
 	}
