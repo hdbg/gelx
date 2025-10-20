@@ -91,7 +91,7 @@ impl MappedRustType {
 					target_token: quote!(#exports_ident::gel_protocol::model::LocalDate),
 				}
 			}
-			CAL_LOCAL_TIME => {
+			CAL_LOCAL_TIME if IS_CHRONO => {
 				ConvertionKind::Fallible {
 					target_token: quote!(#exports_ident::gel_protocol::model::LocalTime),
 				}
