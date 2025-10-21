@@ -1033,6 +1033,7 @@ dependencies = [
 name = "gelx_cli"
 version = "0.8.5"
 dependencies = [
+ "check_keyword",
  "clap",
  "futures",
  "gelx_core",
@@ -1040,6 +1041,7 @@ dependencies = [
  "insta",
  "insta-cmd",
  "proc-macro2",
+ "quote",
  "serde_json",
  "similar",
  "tokio",

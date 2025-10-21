@@ -18,11 +18,13 @@ name = "gelx"
 path = "src/main.rs"
 
 [dependencies]
+check_keyword = { workspace = true, default-features = true }
 clap = { workspace = true, default-features = true, features = ["derive"] }
 futures = { workspace = true, default-features = true }
 gelx_core = { workspace = true, default-features = true }
 heck = { workspace = true, default-features = true }
 proc-macro2 = { workspace = true, default-features = true }
+quote = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
 similar = { workspace = true, default-features = true }
 tokio = { workspace = true, default-features = true, features = ["full"] }

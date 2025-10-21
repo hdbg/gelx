@@ -108,11 +108,52 @@ gelx generate --cwd path/to/your/crate --json
 The CLI will:
 
 - Read configuration from `[package.metadata.gelx]` in your `Cargo.toml`.
-- Scan the directory specified by `queries` (default: `./queries`) for `.edgeql` files.
+- Scan the directory specified by `queries` (default: `./queries`) for `.edgeql` files, including files in subdirectories.
 - Connect to your Gel instance to get type information for each query.
-- Generate corresponding Rust modules.
+- Generate corresponding Rust modules, with subdirectories creating nested modules.
 - If `--json` is used, print the combined code to the terminal as JSON.
 - Otherwise, write the combined code to the folder specified by `output_path` (default: `./src/db`).
+
+### Subfolder Support
+
+The CLI now supports organizing queries in subfolders. For example, with this structure:
+
+```text
+queries/
+  system_statistics.edgeql
+  user/
+    insert.edgeql
+    delete.edgeql
+```
+
+The generated code will be:
+
+```rust
+pub mod db {
+  // shared symbols
+  pub mod system_statistics {
+    pub struct Input { ... }
+    pub struct Output { ... }
+    pub fn query(client: &Client, input: &Input) -> Result<Output, Error> { ... }
+  }
+  pub mod user {
+    use super::*;
+    
+    pub mod insert {
+      pub struct Input { ... }
+      pub struct Output { ... }
+      pub fn query(client: &Client, input: &Input) -> Result<Output, Error> { ... }
+    }
+    pub mod delete {
+      pub struct Input { ... }
+      pub struct Output { ... }
+      pub fn query(client: &Client, input: &Input) -> Result<Output, Error> { ... }
+    }
+  }
+}
+```
+
+This allows for better organization of queries in larger projects.
 
 #### `gelx check`
 
