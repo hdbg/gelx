@@ -19,7 +19,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 async-trait = { workspace = true, default-features = true, optional = true }
 bigdecimal = { workspace = true, default-features = true, optional = true }
-bytes = { workspace = true, default-features = true }
+bytes = { workspace = true, features = ["serde", "std"] }
 cfg-if = { workspace = true, default-features = true }
 chrono = { workspace = true, default-features = true, optional = true }
 derive_more = { workspace = true, default-features = true, features = [

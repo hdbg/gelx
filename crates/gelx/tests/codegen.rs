@@ -84,9 +84,10 @@ pub fn testname() -> String {
 #[case::geometry("select ext::postgis::makepoint(1.0, 1.0)")]
 #[case::geography("select <ext::postgis::geography>ext::postgis::makepoint(1.0, 1.0)")]
 #[case::custom_scalar("select (insert Simple { position := <default::Position>$position }) {**};")]
+#[case::bytes_filter("select Transaction {amount} filter .transaction_content = <bytes>$input;")]
 #[cfg_attr(
 	feature = "with_bigdecimal",
-	case::bigdecimal_arg("select Transaction {*} filter .amount = <decimal>$amount;")
+	case::bigdecimal_arg("select Transaction {amount} filter .amount = <decimal>$amount;")
 )]
 #[cfg_attr(
 	feature = "with_chrono",
@@ -95,7 +96,7 @@ pub fn testname() -> String {
 #[cfg_attr(
 	feature = "with_bigdecimal",
 	case::bigdecimal_optional_arg(
-		"with amount := <optional decimal>$amount, select Transaction {*} filter (.amount = \
+		"with amount := <optional decimal>$amount, select Transaction {tx_hash} filter (.amount = \
 		 amount if exists amount else True);"
 	)
 )]

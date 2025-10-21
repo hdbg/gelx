@@ -246,8 +246,8 @@ impl ExploreResult {
 		}
 	}
 }
-impl From<MappedRustType> for ExploreResult {
-	fn from(value: MappedRustType) -> Self {
+impl From<MappedScalar> for ExploreResult {
+	fn from(value: MappedScalar) -> Self {
 		Self {
 			token: Some(value.token),
 			conversion: value.convertion_kind,
@@ -626,54 +626,43 @@ fn explore_object_shape_descriptor(
 		});
 
 		if is_input {
-			let create_map = |src_ident: TokenStream, target_token: TokenStream| {
-				quote! {
-					let value: #target_token = #src_ident.clone().try_into().map_err(|e| {
-							<#exports_ident::gel_errors::kinds::NumericOutOfRangeError as #exports_ident::gel_errors::ErrorKind>::build()
-						})?;
-					value
+			let src_ident = quote!(self.#safe_name_ident);
+			match (element.cardinality()) {
+				(Cardinality::One) => {
+					let conv = output
+						.conversion
+						.generate_encoding_chunk(&src_ident, &exports_ident);
+					impl_named_args.push(quote!(#name => #conv,));
 				}
-			};
-			match (output.conversion, element.cardinality()) {
-				(ConvertionKind::Direct, _) => {
-					impl_named_args.push(quote!(#name => self.#safe_name_ident.clone(),));
-				}
-				(ConvertionKind::Fallible { .. }, Cardinality::NoResult) => {
+				(Cardinality::NoResult) => {
 					panic!("Fallible conversion kind is not supported for `NoResult` cardinality");
 				}
-				(ConvertionKind::Fallible { target_token }, Cardinality::One) => {
-					let conv = create_map(quote!(self.#safe_name_ident), target_token);
-					impl_named_args.push(quote! {
-						#name => {
-							#conv
-						},
-					});
-				}
-				(ConvertionKind::Fallible { target_token }, Cardinality::AtMostOne) => {
+				(Cardinality::AtMostOne) => {
 					let closure_capture_ident = format_ident!("closure_opt_{}", safe_name_ident);
-					let conv = create_map(quote!(#closure_capture_ident), target_token);
+					let conv = output
+						.conversion
+						.generate_encoding_chunk(&quote!(#closure_capture_ident), &exports_ident);
 					impl_named_args.push(quote! {
 						#name => {
 						  match self.#safe_name_ident.clone() {
 							  Some(#closure_capture_ident) => {
-								  Some( { #conv})
+								  Some( #conv )
 							  },
 							  None => None,
 						  }
 						},
 					});
 				}
-				(
-					ConvertionKind::Fallible { target_token },
-					Cardinality::Many | Cardinality::AtLeastOne,
-				) => {
+				(Cardinality::Many | Cardinality::AtLeastOne) => {
 					let closure_capture_ident = format_ident!("many_{}", safe_name_ident);
-					let conv = create_map(quote!(#closure_capture_ident), target_token);
+					let conv = output
+						.conversion
+						.generate_encoding_chunk(&quote!(#closure_capture_ident), &exports_ident);
 					impl_named_args.push(quote! {
 						#name => {
 							let mut vec = Vec::with_capacity(self.#safe_name_ident.len());
 							for #closure_capture_ident in &self.#safe_name_ident {
-								vec.push( { #conv });
+								vec.push( #conv );
 							}
 							vec
 						},

@@ -429,6 +429,7 @@ pub mod select_transactions {
         pub amount: __g::BigDecimal,
         pub confirmed: bool,
         pub confirmed_at: Option<__g::DateTime>,
+        pub transaction_content: Option<__g::bytes::Bytes>,
         pub tx_hash: String,
     }
     /// The original query string provided to the macro. Can be reused in your codebase.

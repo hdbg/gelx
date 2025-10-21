@@ -1,3 +1,7 @@
+---
+source: crates/gelx/tests/codegen.rs
+expression: "&content"
+---
 pub mod example {
     use ::gelx::exports as __g;
     /// Execute the desired query.
@@ -52,9 +56,9 @@ pub mod example {
         pub amount: __g::BigDecimal,
         pub confirmed: bool,
         pub confirmed_at: Option<__g::DateTime>,
+        pub transaction_content: Option<__g::bytes::Bytes>,
         pub tx_hash: String,
     }
     /// The original query string provided to the macro. Can be reused in your codebase.
     pub const QUERY: &str = "with amount := <optional decimal>$amount, select Transaction {*} filter (.amount = amount if exists amount else True);";
 }
-fn main() {}

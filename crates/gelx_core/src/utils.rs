@@ -32,11 +32,12 @@ use gel_protocol::codec::STD_UUID;
 use gel_protocol::model::Uuid;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
+use quote::format_ident;
 use quote::quote;
 use syn::Ident;
 
-pub(crate) fn uuid_to_token_name(uuid: &Uuid, exports_ident: &Ident) -> MappedRustType {
-	MappedRustType::new(uuid, exports_ident).unwrap_or(MappedRustType {
+pub(crate) fn uuid_to_token_name(uuid: &Uuid, exports_ident: &Ident) -> MappedScalar {
+	MappedScalar::new(uuid, exports_ident).unwrap_or(MappedScalar {
 		token: quote!(#exports_ident::gel_protocol::value::Value),
 		import: None,
 		convertion_kind: ConvertionKind::Direct,
@@ -50,60 +51,127 @@ pub enum ConvertionKind {
 	Fallible {
 		target_token: TokenStream,
 	},
+	ValueVariant {
+		variant_name: Ident,
+	},
 }
 
-pub struct MappedRustType {
+impl ConvertionKind {
+	pub fn is_direct(&self) -> bool {
+		matches!(self, Self::Direct)
+	}
+
+	pub fn generate_encoding_chunk(
+		&self,
+		src_ident: &TokenStream,
+		exports_ident: &Ident,
+	) -> TokenStream {
+		match &self {
+			ConvertionKind::Direct => quote! { #src_ident.clone() },
+
+			ConvertionKind::Fallible { target_token } => {
+				quote! {
+					{
+						let value: #target_token = #src_ident.clone().try_into().map_err(|e| {
+									<#exports_ident::gel_errors::kinds::NumericOutOfRangeError as #exports_ident::gel_errors::ErrorKind>::build()
+								})?;
+							value
+					}
+				}
+			}
+			ConvertionKind::ValueVariant { variant_name } => {
+				quote! {
+					#exports_ident::gel_protocol::value::Value::#variant_name(#src_ident.clone())
+				}
+			}
+		}
+	}
+}
+
+pub struct MappedScalar {
 	pub token: TokenStream,
 	pub import: Option<TokenStream>,
 	pub convertion_kind: ConvertionKind,
 }
 
-impl MappedRustType {
-	pub fn new(uuid: &Uuid, exports_ident: &Ident) -> Option<MappedRustType> {
-		const IS_CHRONO: bool = cfg!(feature = "with_chrono");
-
+impl MappedScalar {
+	pub fn new(uuid: &Uuid, exports_ident: &Ident) -> Option<MappedScalar> {
 		let token_name = maybe_uuid_to_token_name(uuid, exports_ident)?;
 		let import = maybe_uuid_to_import(uuid, exports_ident);
 
-		let is_fallible = match *uuid {
-			STD_DECIMAL if cfg!(feature = "with_bigdecimal") => {
-				ConvertionKind::Fallible {
-					target_token: quote!(#exports_ident::gel_protocol::model::Decimal),
-				}
-			}
-			STD_BIGINT if cfg!(feature = "with_bigint") => {
-				ConvertionKind::Fallible {
-					target_token: quote!(#exports_ident::gel_protocol::model::BigInt),
-				}
-			}
-			STD_DATETIME | STD_PG_TIMESTAMPTZ if IS_CHRONO => {
-				ConvertionKind::Fallible {
-					target_token: quote!(#exports_ident::gel_protocol::model::Datetime),
-				}
-			}
-			CAL_LOCAL_DATETIME | STD_PG_TIMESTAMP if IS_CHRONO => {
-				ConvertionKind::Fallible {
-					target_token: quote!(#exports_ident::gel_protocol::model::LocalDatetime),
-				}
-			}
-			CAL_LOCAL_DATE | STD_PG_DATE if IS_CHRONO => {
-				ConvertionKind::Fallible {
-					target_token: quote!(#exports_ident::gel_protocol::model::LocalDate),
-				}
-			}
-			CAL_LOCAL_TIME if IS_CHRONO => {
-				ConvertionKind::Fallible {
-					target_token: quote!(#exports_ident::gel_protocol::model::LocalTime),
-				}
-			}
+		let fallible = match_fallible(uuid, exports_ident);
+		let variant = match_value_variant(uuid);
 
-			_ => ConvertionKind::Direct,
+		let conv = if !fallible.is_direct() {
+			fallible
+		} else if !variant.is_direct() {
+			variant
+		} else {
+			ConvertionKind::Direct
 		};
-		Some(MappedRustType {
+		Some(MappedScalar {
 			token: token_name,
 			import,
-			convertion_kind: is_fallible,
+			convertion_kind: conv,
 		})
+	}
+}
+
+fn match_value_variant(uuid: &Uuid) -> ConvertionKind {
+	match *uuid {
+		STD_BYTES => {
+			ConvertionKind::ValueVariant {
+				variant_name: format_ident!("Bytes"),
+			}
+		}
+		CFG_MEMORY => {
+			ConvertionKind::ValueVariant {
+				variant_name: format_ident!("ConfigMemory"),
+			}
+		}
+		// PGVECTOR_VECTOR => format_ident!(""),
+		// POSTGIS_GEOMETRY => quote!(#exports_ident::Geometry),
+		// POSTGIS_GEOGRAPHY => quote!(#exports_ident::Geography),
+		_ => ConvertionKind::Direct,
+	}
+}
+
+fn match_fallible(uuid: &Uuid, exports_ident: &Ident) -> ConvertionKind {
+	const IS_CHRONO: bool = cfg!(feature = "with_chrono");
+
+	match *uuid {
+		STD_DECIMAL if cfg!(feature = "with_bigdecimal") => {
+			ConvertionKind::Fallible {
+				target_token: quote!(#exports_ident::gel_protocol::model::Decimal),
+			}
+		}
+		STD_BIGINT if cfg!(feature = "with_bigint") => {
+			ConvertionKind::Fallible {
+				target_token: quote!(#exports_ident::gel_protocol::model::BigInt),
+			}
+		}
+		STD_DATETIME | STD_PG_TIMESTAMPTZ if IS_CHRONO => {
+			ConvertionKind::Fallible {
+				target_token: quote!(#exports_ident::gel_protocol::model::Datetime),
+			}
+		}
+		CAL_LOCAL_DATETIME | STD_PG_TIMESTAMP if IS_CHRONO => {
+			ConvertionKind::Fallible {
+				target_token: quote!(#exports_ident::gel_protocol::model::LocalDatetime),
+			}
+		}
+		CAL_LOCAL_DATE | STD_PG_DATE if IS_CHRONO => {
+			ConvertionKind::Fallible {
+				target_token: quote!(#exports_ident::gel_protocol::model::LocalDate),
+			}
+		}
+		CAL_LOCAL_TIME if IS_CHRONO => {
+			ConvertionKind::Fallible {
+				target_token: quote!(#exports_ident::gel_protocol::model::LocalTime),
+			}
+		}
+
+		_ => ConvertionKind::Direct,
 	}
 }
 
