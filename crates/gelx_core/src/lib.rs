@@ -627,17 +627,17 @@ fn explore_object_shape_descriptor(
 
 		if is_input {
 			let src_ident = quote!(self.#safe_name_ident);
-			match (element.cardinality()) {
-				(Cardinality::One) => {
+			match element.cardinality() {
+				Cardinality::One => {
 					let conv = output
 						.conversion
 						.generate_encoding_chunk(&src_ident, &exports_ident);
 					impl_named_args.push(quote!(#name => #conv,));
 				}
-				(Cardinality::NoResult) => {
+				Cardinality::NoResult => {
 					panic!("Fallible conversion kind is not supported for `NoResult` cardinality");
 				}
-				(Cardinality::AtMostOne) => {
+				Cardinality::AtMostOne => {
 					let closure_capture_ident = format_ident!("closure_opt_{}", safe_name_ident);
 					let conv = output
 						.conversion
@@ -653,7 +653,7 @@ fn explore_object_shape_descriptor(
 						},
 					});
 				}
-				(Cardinality::Many | Cardinality::AtLeastOne) => {
+				Cardinality::Many | Cardinality::AtLeastOne => {
 					let closure_capture_ident = format_ident!("many_{}", safe_name_ident);
 					let conv = output
 						.conversion
